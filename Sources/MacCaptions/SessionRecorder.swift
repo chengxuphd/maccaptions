@@ -66,8 +66,20 @@ final class SessionRecorder: ObservableObject {
     private var jsonl: FileHandle?
     private var md: FileHandle?
 
-    static var rootFolder: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("LiveCaptions")
+    static var documentsFolder: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
+    static var rootFolder: URL { documentsFolder.appendingPathComponent("MacCaptions") }
+
+    /// Versions 0.1.0 and 0.1.1 saved to "~/Documents/LiveCaptions". Move that folder to the new name, once — but only if
+    /// it clearly contains MacCaptions sessions (every item is a folder with a session.json) and the new folder does not
+    /// exist yet, so nothing of anyone else's is ever touched or overwritten.
+    static func migrateLegacyFolder(in documents: URL) {
+        let fm = FileManager.default
+        let old = documents.appendingPathComponent("LiveCaptions"), new = documents.appendingPathComponent("MacCaptions")
+        guard fm.fileExists(atPath: old.path), !fm.fileExists(atPath: new.path),
+              let items = try? fm.contentsOfDirectory(atPath: old.path).filter({ $0 != ".DS_Store" }), !items.isEmpty,
+              items.allSatisfy({ fm.fileExists(atPath: old.appendingPathComponent($0).appendingPathComponent("session.json").path) })
+        else { return }
+        try? fm.moveItem(at: old, to: new)
     }
 
     private func offset() -> Double { Date().timeIntervalSince(sessionStart) }
@@ -79,6 +91,7 @@ final class SessionRecorder: ObservableObject {
     }
 
     func beginSession(echoCancel: Bool) throws {
+        Self.migrateLegacyFolder(in: Self.documentsFolder)
         sessionID = UUID(); lastError = nil
         sessionStart = Date()
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd_HHmm"

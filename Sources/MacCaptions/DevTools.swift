@@ -100,6 +100,23 @@ func runSelfTests() {
     check("store capped at 1000 lines", st4.lines.count <= 1001)
     st4.update(source: .mic, text: "still talking right now and more", isFinal: false)
     check("in-progress line survives trimming", st4.line(id: live)?.en == "still talking right now and more")
+    // 6. Sessions saved by 0.1.0 / 0.1.1 in "LiveCaptions" move to "MacCaptions" — safely.
+    let fm = FileManager.default
+    func scratch() -> URL { let u = fm.temporaryDirectory.appendingPathComponent("mc-\(UUID().uuidString)"); try? fm.createDirectory(at: u, withIntermediateDirectories: true); return u }
+    func touch(_ u: URL) { try? fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true); fm.createFile(atPath: u.path, contents: Data("x".utf8)) }
+    let d1 = scratch(); touch(d1.appendingPathComponent("LiveCaptions/2026-01-01_0900/session.json")); touch(d1.appendingPathComponent("LiveCaptions/.DS_Store"))
+    SessionRecorder.migrateLegacyFolder(in: d1)
+    check("migration: old sessions moved to MacCaptions", fm.fileExists(atPath: d1.appendingPathComponent("MacCaptions/2026-01-01_0900/session.json").path)
+          && !fm.fileExists(atPath: d1.appendingPathComponent("LiveCaptions").path))
+    let d2 = scratch(); touch(d2.appendingPathComponent("LiveCaptions/holiday-photos/img.jpg"))
+    SessionRecorder.migrateLegacyFolder(in: d2)
+    check("migration: a foreign 'LiveCaptions' folder is left alone", fm.fileExists(atPath: d2.appendingPathComponent("LiveCaptions/holiday-photos/img.jpg").path)
+          && !fm.fileExists(atPath: d2.appendingPathComponent("MacCaptions").path))
+    let d3 = scratch(); touch(d3.appendingPathComponent("LiveCaptions/2026-01-01_0900/session.json")); touch(d3.appendingPathComponent("MacCaptions/2026-02-02_1000/session.json"))
+    SessionRecorder.migrateLegacyFolder(in: d3)
+    check("migration: never overwrites an existing MacCaptions folder", fm.fileExists(atPath: d3.appendingPathComponent("LiveCaptions/2026-01-01_0900/session.json").path)
+          && fm.fileExists(atPath: d3.appendingPathComponent("MacCaptions/2026-02-02_1000/session.json").path))
+    for d in [d1, d2, d3] { try? fm.removeItem(at: d) }
     print(failed == 0 ? "ALL SELF-TESTS PASSED" : "\(failed) SELF-TEST(S) FAILED")
 }
 

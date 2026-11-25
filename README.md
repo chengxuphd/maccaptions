@@ -50,7 +50,7 @@ Everything runs **on your Mac**: speech recognition and translation use Apple's 
 | **Floating window / Window style…** | Show the caption window and edit its look (also in the window's right-click menu). |
 | **Hide mic echo** | Hides mic lines that repeat the system audio (headphones avoid the problem entirely). |
 
-**Saved sessions** go to `~/Documents/LiveCaptions/<date_time>/`:
+**Saved sessions** go to `~/Documents/MacCaptions/<date_time>/`:
 
 ```
 audio/mic_001.m4a, system_001.m4a, …   one file per source per recording stretch (16 kHz mono AAC)
@@ -58,6 +58,8 @@ transcript.md                           readable English + Chinese transcript
 transcript.jsonl                        one JSON object per sentence (timing, speaker, English, Chinese, flags)
 session.json                            session info and where each audio segment starts and ends
 ```
+
+Sessions saved by versions 0.1.0 / 0.1.1 in `~/Documents/LiveCaptions` are moved to `~/Documents/MacCaptions` automatically the first time you start captions (only if that folder holds nothing but MacCaptions sessions and `MacCaptions` does not exist yet).
 
 > Recording a meeting may require the consent of the other participants. Check the rules that apply to you.
 
@@ -70,6 +72,8 @@ git clone https://github.com/chengxuphd/maccaptions.git
 cd maccaptions
 ./make_app.sh            # builds MacCaptions.app (ad-hoc signed) in this folder
 open MacCaptions.app
+
+VERSION=1.2.3 ./make_release.sh   # also builds the .dmg and .zip (with checksums) in dist/
 ```
 
 Developer tooling (self-tests, a silent audio-file feeder for CPU/memory measurements, screenshot renderers) is compiled only with a flag and is **not** part of the shipped app:
