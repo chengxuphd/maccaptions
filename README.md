@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/icon.png" alt="MacCaptions icon" width="128"></p>
+
 # MacCaptions
 
 Live **English captions with Chinese (Simplified) translation** for your Mac — for online meetings, videos and your own voice.
