@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key><string>io.github.chengxuphd.maccaptions</string>
+    <key>CFBundleName</key><string>MacCaptions</string>
+    <key>LSUIElement</key><true/>
+    <key>NSMicrophoneUsageDescription</key><string>MacCaptions captions your microphone.</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>MacCaptions transcribes speech on-device.</string>
+    <key>NSAudioCaptureUsageDescription</key><string>MacCaptions captions system audio (meetings, videos).</string>
+</dict>
+</plist>
