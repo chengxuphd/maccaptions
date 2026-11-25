@@ -23,8 +23,8 @@ Everything runs **on your Mac**: speech recognition and translation use Apple's 
 
 ## Install
 
-1. Download `MacCaptions-<version>-macos-arm64.zip` from the [Releases](../../releases) page and unzip it.
-2. Drag **MacCaptions.app** to your *Applications* folder.
+1. Download `MacCaptions-<version>-macos-arm64.dmg` from the [Releases](../../releases) page (a `.zip` of the same app is there too).
+2. Open the DMG and drag **MacCaptions.app** onto the **Applications** shortcut.
 3. The app is **ad-hoc signed, not notarized** (there is no paid Apple developer account behind it), so macOS will warn you the first time. Either:
    - right-click the app → **Open** → **Open**; if there is no Open button, go to *System Settings → Privacy & Security* and click **Open Anyway**, or
    - run once in Terminal: `xattr -dr com.apple.quarantine /Applications/MacCaptions.app`
