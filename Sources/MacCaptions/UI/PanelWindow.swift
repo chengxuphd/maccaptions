@@ -45,7 +45,7 @@ final class PanelWindowController: NSObject {
     }
 
     private func makePanel() -> KeyablePanel {
-        let p = KeyablePanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 600),
+        let p = KeyablePanel(contentRect: NSRect(origin: .zero, size: PanelView.size),
                              styleMask: [.borderless, .fullSizeContentView],
                              backing: .buffered, defer: false)
         p.level = .popUpMenu
@@ -57,7 +57,7 @@ final class PanelWindowController: NSObject {
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         let host = NSHostingView(rootView: PanelView(engine: engine, store: engine.store, settings: engine.settings))
-        host.frame = NSRect(x: 0, y: 0, width: 480, height: 600)
+        host.frame = NSRect(origin: .zero, size: PanelView.size)
         let bg = NSVisualEffectView(frame: host.frame)
         bg.material = .popover
         bg.state = .active

@@ -135,8 +135,18 @@ final class MenuBarController {
         // Chinese must belong to the same sentence as the English. While it is still pending, show "…" (Mix) or the
         // previous sentence's translation (Chinese-only, where an empty bar would flicker).
         let lineZh = line?.zh ?? ""
-        let zh = settings.menuBarMode == .zh ? (lineZh.isEmpty ? engine.store.latestZh : lineZh)
-                                             : (lineZh.isEmpty && !en.isEmpty ? "…" : lineZh)
+        let zh: String
+        if settings.translationMode == .llm {
+            // Chinese only arrives after a sentence ends, usually when the next one has begun: pairing strictly would
+            // show "…" almost all the time. So show a recent sentence's translation until this one has its own.
+            if !lineZh.isEmpty { zh = lineZh }
+            else if line?.zhMissing == true { zh = "—" }
+            else { let recent = engine.store.recentZh(); zh = recent.isEmpty && !en.isEmpty ? "…" : recent }
+        } else if settings.menuBarMode == .zh {
+            zh = lineZh.isEmpty ? engine.store.latestZh : lineZh
+        } else {
+            zh = lineZh.isEmpty && !en.isEmpty ? "…" : lineZh
+        }
         let l = layout(en: en, zh: zh, mode: settings.menuBarMode, rec: engine.recorder.isRecording, total: total,
                        share: settings.menuBarMixShare, idleText: engine.running ? "Listening…" : "MacCaptions")
         let key = "\(l)"

@@ -1,0 +1,33 @@
+Our new model is much cheaper to serve.
+It still struggles with long documents, though.
+We tried chunking them into smaller pieces.
+That helped, but it loses the thread between sections.
+Let's park that idea until we have more data.
+I'll loop in the infra team.
+They're the ones who own the pipeline.
+Can you walk me through the failure cases?
+Sure, the first one is kind of a corner case.
+The agent keeps calling the same tool over and over.
+
+Latency went up by forty percent after the last release.
+We rolled it back this morning.
+The root cause was a memory leak in the cache.
+I'm going to drop off in five minutes.
+Let's wrap this up.
+Does that make sense to everyone?
+No worries, take your time.
+We're on the same page then.
+
+My flight got bumped to tomorrow.
+So I might have to dial in from the airport.
+The connection there is usually spotty.
+Could you cover for me if I drop?
+You bet.
+
+Honestly, I wouldn't bet on it.
+The paper claims a two point three times speedup.
+But they only tested it on toy problems.
+So take that with a grain of salt.
+We need to um we need to double check the
+the numbers before we send anything out.
+Does anyone have a hard stop at four?

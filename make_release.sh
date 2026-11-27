@@ -3,7 +3,7 @@
 # Usage: VERSION=0.1.2 ./make_release.sh
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION=${VERSION:-0.1.0}
+VERSION=${VERSION:-0.1.2}
 export VERSION
 ./make_app.sh
 NAME="MacCaptions-$VERSION-macos-arm64"

@@ -5,6 +5,8 @@
     <key>CFBundleIdentifier</key><string>io.github.chengxuphd.maccaptions</string>
     <key>CFBundleName</key><string>MacCaptions</string>
     <key>LSUIElement</key><true/>
+    <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+    <key>NSLocalNetworkUsageDescription</key><string>MacCaptions sends caption text to the translation server you chose on your local network.</string>
     <key>NSMicrophoneUsageDescription</key><string>MacCaptions captions your microphone.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>MacCaptions transcribes speech on-device.</string>
     <key>NSAudioCaptureUsageDescription</key><string>MacCaptions captions system audio (meetings, videos).</string>

@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuBar = MenuBarController(engine: engine)
+        LLMSettingsWindowController.shared.configure(service: engine.llmService)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(systemWillPowerOff(_:)),
                                                           name: NSWorkspace.willPowerOffNotification, object: nil)
         floating = FloatingWindowController(store: engine.store, settings: engine.settings)

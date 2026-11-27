@@ -16,10 +16,32 @@ enum WindowContent: String, CaseIterable, Identifiable {
     }
 }
 
+/// Which engine produces the Chinese.
+enum TranslationMode: String, CaseIterable, Identifiable {
+    case apple, appleLLM, llm
+    var id: String { rawValue }
+    var label: String {
+        switch self { case .apple: "Apple"; case .appleLLM: "Apple + LLM"; case .llm: "LLM" }
+    }
+    var usesApple: Bool { self != .llm }
+    var usesLLM: Bool { self != .apple }
+
+    /// Builds from before there were three modes saved only an on/off switch for the LLM ("useLLM").
+    static func saved(_ raw: String?, legacyUseLLM: Bool) -> TranslationMode {
+        raw.flatMap(TranslationMode.init(rawValue:)) ?? (legacyUseLLM ? .appleLLM : .apple)
+    }
+}
+
 @MainActor
 final class Settings: ObservableObject {
     static let shared = Settings()
-    private let d = UserDefaults.standard
+    private let d: UserDefaults = {
+        #if DEVTOOLS
+        // Tests must never touch the real app's settings.
+        if let suite = ProcessInfo.processInfo.environment["MACCAPTIONS_DEFAULTS_SUITE"], let u = UserDefaults(suiteName: suite) { return u }
+        #endif
+        return .standard
+    }()
 
     @Published var menuBarMode: MenuBarMode { didSet { d.set(menuBarMode.rawValue, forKey: "menuBarMode") } }
     @Published var showMenuBar: Bool { didSet { d.set(showMenuBar, forKey: "showMenuBar") } }
@@ -33,6 +55,33 @@ final class Settings: ObservableObject {
     /// Recording is ON at every launch (by design: "record by default"); the button only changes the current run.
     @Published var recordAudio: Bool
     @Published var partialTranslation: Bool { didSet { d.set(partialTranslation, forKey: "partialTranslation") } }
+
+    /// How often a sentence still being spoken is translated again: seconds between updates. 1 = every time new words
+    /// arrive (the recognizer delivers them about once a second, so nothing faster is possible).
+    @Published var liveInterval: Double { didSet { d.set(liveInterval, forKey: "liveInterval") } }
+    // Translation engine. Apple's on-device engine alone is the default; the other two modes use an LLM.
+    @Published var translationMode: TranslationMode { didSet { d.set(translationMode.rawValue, forKey: "translationMode") } }
+    var useLLM: Bool { translationMode.usesLLM }
+    @Published var llmProvider: LLMProvider { didSet { d.set(llmProvider.rawValue, forKey: "llmProvider") } }
+    /// One saved profile per provider (no API keys; those are in the Keychain).
+    @Published var llmProfiles: [String: LLMProfile] { didSet { d.set(try? JSONEncoder().encode(llmProfiles), forKey: "llmProfiles") } }
+    @Published var llmContextCount: Int { didSet { d.set(llmContextCount, forKey: "llmContextCount") } }
+    @Published var llmTimeout: Double { didSet { d.set(llmTimeout, forKey: "llmTimeout") } }
+    @Published var llmTopic: String { didSet { d.set(llmTopic, forKey: "llmTopic") } }
+    @Published var llmGlossary: String { didSet { d.set(llmGlossary, forKey: "llmGlossary") } }
+
+    /// Bumped when an API key is saved or removed, so views check again (the keys themselves are never stored here).
+    @Published var llmKeyVersion = 0
+
+    /// The profile of the selected provider.
+    var llmProfile: LLMProfile {
+        get { llmProfiles[llmProvider.rawValue] ?? .defaults(for: llmProvider) }
+        set { llmProfiles[llmProvider.rawValue] = newValue }
+    }
+    var llmConfig: LLMConfig {
+        LLMConfig(provider: llmProvider, profile: llmProfile, contextCount: llmContextCount, timeout: llmTimeout,
+                  topic: llmTopic, glossary: llmGlossary)
+    }
     @Published var windowFontSize: Double { didSet { d.set(windowFontSize, forKey: "windowFontSize") } }
     @Published var windowLines: Int { didSet { d.set(windowLines, forKey: "windowLines") } }
     @Published var menuBarWidth: Double { didSet { d.set(menuBarWidth, forKey: "menuBarWidth") } }
@@ -65,6 +114,9 @@ final class Settings: ObservableObject {
             "windowEnColorHex": "#D9D9D9", "windowZhColorHex": "#FFFFFF", "windowTextOpacity": 1.0,
             "windowBgColorHex": "#000000", "windowBgOpacity": 0.72, "windowNoBackground": false, "windowBold": false,
             "windowShowSpeaker": false, "windowWidth": 760.0, "windowClickThrough": false, "windowCustomPosition": false, "menuBarWidth": 380.0, "menuBarMixShare": 0.56,
+            "liveInterval": 1.0,
+            "useLLM": false, "llmProvider": LLMProvider.ollama.rawValue, "llmContextCount": 3, "llmTimeout": 8.0,
+            "llmTopic": "", "llmGlossary": "",
         ])
         menuBarMode = MenuBarMode(rawValue: d.string(forKey: "menuBarMode") ?? "") ?? .zh
         showMenuBar = d.bool(forKey: "showMenuBar")
@@ -92,6 +144,14 @@ final class Settings: ObservableObject {
         windowWidth = d.double(forKey: "windowWidth")
         windowClickThrough = d.bool(forKey: "windowClickThrough")
         windowCustomPosition = d.bool(forKey: "windowCustomPosition")
+        liveInterval = d.double(forKey: "liveInterval")
+        translationMode = .saved(d.string(forKey: "translationMode"), legacyUseLLM: d.bool(forKey: "useLLM"))
+        llmProvider = LLMProvider(rawValue: d.string(forKey: "llmProvider") ?? "") ?? .ollama
+        llmProfiles = d.data(forKey: "llmProfiles").flatMap { try? JSONDecoder().decode([String: LLMProfile].self, from: $0) } ?? [:]
+        llmContextCount = d.integer(forKey: "llmContextCount")
+        llmTimeout = d.double(forKey: "llmTimeout")
+        llmTopic = d.string(forKey: "llmTopic") ?? ""
+        llmGlossary = d.string(forKey: "llmGlossary") ?? ""
     }
 
     func resetWindowStyle() {

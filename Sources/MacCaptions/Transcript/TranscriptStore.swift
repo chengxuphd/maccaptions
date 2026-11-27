@@ -11,6 +11,12 @@ struct CaptionLine: Identifiable, Equatable {
     var updated = Date()
     var en: String
     var zh: String = ""
+    /// `zh` came from the LLM; a late Apple translation of the same text must not overwrite it.
+    var zhRefined = false
+    /// "LLM" mode only: `zh` is the LLM's translation of words spoken so far, shown until the finished one arrives.
+    var zhLive = false
+    /// "LLM" mode only: the LLM gave nothing for this sentence and no translation is coming.
+    var zhMissing = false
     var isFinal = false
     /// Mic line that is just the system audio heard through the speakers (hidden from views). Re-decided on every
     /// update while the line is young, so it can be un-hidden if the speaker keeps talking.
@@ -53,6 +59,7 @@ final class TranscriptStore: ObservableObject {
         }
         let id: UUID
         if let cur = current[source], let i = index(of: cur) {
+            if lines[i].en != text { lines[i].zhRefined = false; lines[i].zhMissing = false }
             lines[i].en = text
             lines[i].isFinal = isFinal
             lines[i].updated = Date()
@@ -73,8 +80,61 @@ final class TranscriptStore: ObservableObject {
 
     /// Does not move `lastUpdated`: a late translation of an older sentence must not hijack the display.
     func setZh(id: UUID, zh: String, forEn en: String) {
+        guard let i = index(of: id), lines[i].en == en, !lines[i].zhRefined else { return }
+        lines[i].zh = zh; lines[i].zhMissing = false; lines[i].zhLive = false
+    }
+
+    /// The LLM's translation replaces Apple's. Like `setZh`, it never moves the display to an older line.
+    func setRefinedZh(id: UUID, zh: String, forEn en: String) {
         guard let i = index(of: id), lines[i].en == en else { return }
-        lines[i].zh = zh
+        var line = lines[i]
+        line.zh = zh; line.zhRefined = true; line.zhMissing = false; line.zhLive = false
+        lines[i] = line
+    }
+
+    /// A translation of the words so far. Only for a sentence that is still being spoken: it may lag a few words
+    /// behind. Like `setZh`, it never moves the display to another line.
+    func setLiveZh(id: UUID, zh: String) {
+        guard let i = index(of: id), !lines[i].isFinal, !lines[i].zhRefined else { return }
+        var line = lines[i]
+        line.zh = zh; line.zhLive = true; line.zhMissing = false
+        lines[i] = line
+    }
+
+    func clearTranslation(id: UUID) {
+        guard let i = index(of: id), !lines[i].zh.isEmpty || lines[i].zhMissing else { return }
+        var line = lines[i]
+        line.zh = ""; line.zhRefined = false; line.zhMissing = false; line.zhLive = false
+        lines[i] = line
+    }
+
+    /// No finished translation is coming. A live one covers only part of the sentence, so it is removed too.
+    func markUntranslated(id: UUID, forEn en: String) {
+        guard let i = index(of: id), lines[i].en == en, lines[i].zh.isEmpty || lines[i].zhLive, !lines[i].zhMissing else { return }
+        var line = lines[i]
+        line.zh = ""; line.zhLive = false; line.zhMissing = true
+        lines[i] = line
+    }
+
+    /// The translation of one of the last few visible sentences, newest first; empty if none of them has one.
+    /// (An older one would be too stale to show next to what is being said now.)
+    func recentZh(lastLines: Int = 3) -> String {
+        visibleLines.suffix(lastLines).last(where: { !$0.zh.isEmpty })?.zh ?? ""
+    }
+
+    /// Background for the LLM: up to `limit` finished, visible sentences spoken before this one, oldest first.
+    /// Sentences from before `since` (an earlier session) or from long before this one are not related to it.
+    func context(before id: UUID, limit: Int, since: Date, maxGap: TimeInterval = 300) -> [ContextLine] {
+        guard limit > 0, let i = index(of: id) else { return [] }
+        let start = lines[i].start
+        var out: [ContextLine] = []
+        for line in lines[..<i].reversed() {
+            if line.start < since || start.timeIntervalSince(line.updated) > maxGap { break }
+            if line.isEcho || !line.isFinal { continue }
+            out.append(ContextLine(speaker: line.source.label, en: line.en))
+            if out.count == limit { break }
+        }
+        return out.reversed()
     }
 
     /// A mic line is "echo" when most of its content words are in the system speech that overlaps it in time

@@ -27,7 +27,8 @@ struct LineRecord: Codable {
     var speaker: String     // "Me" | "Them"
     var en: String
     var zh: String
-    var engine: String
+    var engine: String      // what produced `zh`: "apple-translation", "llm:<provider>/<model>", or "none" (empty `zh`)
+    var zhApple: String? = nil    // Apple's translation, kept when the LLM's replaced it
     var recording: Bool     // this speaker's audio track was being recorded when the sentence finished
     var echo: Bool          // mic line judged to be the system audio heard through the speakers
 }
@@ -67,7 +68,12 @@ final class SessionRecorder: ObservableObject {
     private var md: FileHandle?
 
     static var documentsFolder: URL { FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0] }
-    static var rootFolder: URL { documentsFolder.appendingPathComponent("MacCaptions") }
+    static var rootFolder: URL {
+        #if DEVTOOLS
+        if let o = rootOverride { return o }          // test sessions never go into the user's folder
+        #endif
+        return documentsFolder.appendingPathComponent("MacCaptions")
+    }
 
     /// Versions 0.1.0 and 0.1.1 saved to "~/Documents/LiveCaptions". Move that folder to the new name, once — but only if
     /// it clearly contains MacCaptions sessions (every item is a folder with a session.json) and the new folder does not
@@ -82,6 +88,10 @@ final class SessionRecorder: ObservableObject {
         try? fm.moveItem(at: old, to: new)
     }
 
+    #if DEVTOOLS
+    static var rootOverride: URL? { ProcessInfo.processInfo.environment["MACCAPTIONS_ROOT"].map { URL(fileURLWithPath: $0) } }
+    #endif
+
     private func offset() -> Double { Date().timeIntervalSince(sessionStart) }
     func isOpen(_ s: Source) -> Bool { openIndex[s] != nil }
 
@@ -90,8 +100,12 @@ final class SessionRecorder: ObservableObject {
         [Source.mic, .system].map { s in accumulated[s, default: 0] + (openSince[s].map { Date().timeIntervalSince($0) } ?? 0) }.max() ?? 0
     }
 
-    func beginSession(echoCancel: Bool) throws {
+    func beginSession(echoCancel: Bool, translationEngine: String = "apple-translation") throws {
+        #if DEVTOOLS
+        if Self.rootOverride == nil { Self.migrateLegacyFolder(in: Self.documentsFolder) }
+        #else
         Self.migrateLegacyFolder(in: Self.documentsFolder)
+        #endif
         sessionID = UUID(); lastError = nil
         sessionStart = Date()
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd_HHmm"
@@ -107,7 +121,7 @@ final class SessionRecorder: ObservableObject {
         md = try FileHandle(forWritingTo: url.appendingPathComponent("transcript.md"))
         safeWrite(md, Data("# Live captions — \(f.string(from: sessionStart))\n\n".utf8))
         info = SessionInfo(startedAt: ISO8601DateFormatter().string(from: sessionStart), endedAt: nil,
-                           language: "en → zh-Hans", echoCancel: echoCancel, translationEngine: "apple-translation", segments: [])
+                           language: "en → zh-Hans", echoCancel: echoCancel, translationEngine: translationEngine, segments: [])
         segmentNumber = [.mic: 0, .system: 0]; accumulated = [.mic: 0, .system: 0]
         openIndex = [:]; openSince = [:]; isRecording = false; closedForStop = []
         writeInfo()
@@ -157,16 +171,17 @@ final class SessionRecorder: ObservableObject {
         catch { lastError = "Could not save transcript: \(error.localizedDescription)" }
     }
 
-    func append(source: Source, start: Date, end: Double, recording: Bool, session: UUID, en: String, zh: String, echo: Bool) {
+    func append(source: Source, start: Date, end: Double, recording: Bool, session: UUID, en: String, zh: String, echo: Bool,
+                engine: String = "apple-translation", zhApple: String? = nil) {
         guard session == sessionID, jsonl != nil else { return }      // late write from a finished session → drop
         let s = start.timeIntervalSince(sessionStart)
         let rec = LineRecord(start: s, end: end, speaker: source.label, en: en, zh: zh,
-                             engine: "apple-translation", recording: recording, echo: echo)
+                             engine: engine, zhApple: zhApple, recording: recording, echo: echo)
         if let data = try? JSONEncoder().encode(rec) { safeWrite(jsonl, data + Data("\n".utf8)) }
         guard !echo else { return }          // echo lines stay in the jsonl (flagged) but not in the readable transcript
         let t = max(0, Int(s))
         let stamp = String(format: "%02d:%02d:%02d", t / 3600, (t / 60) % 60, t % 60)
-        safeWrite(md, Data("**[\(stamp)] \(source.label):** \(en)\n\n> \(zh)\n\n".utf8))
+        safeWrite(md, Data("**[\(stamp)] \(source.label):** \(en)\n\n> \(zh.isEmpty ? "(not translated)" : zh)\n\n".utf8))
     }
 
     func endSession() {
